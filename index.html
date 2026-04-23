@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Nutrition Tracker v1.1</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1 1'><rect width='1' height='1' fill='black'/></svg>">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700;900&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -573,6 +574,8 @@
 const STORAGE_KEY = 'nt_days_v2';
 const SETTINGS_KEY = 'nt_settings_v2';
 const API_KEY_STORE = 'nt_google_apikey';
+const SEED_DATE = '2026-04-16';
+const FIRST_LOG_KEY = 'nt_first_logged';
 let currentView = 'log';
 let editingDate = null;
 let editModalItems = [];
@@ -809,6 +812,7 @@ function confirmLog() {
   if (!pendingItems.length) return;
   const today = getTodayKey();
   const days = loadDays();
+  const isFirstLog = !localStorage.getItem(FIRST_LOG_KEY);
   const dayData = days[today]||{sections:[],activity:'',feeling:0,notes:''};
   pendingItems.forEach(item => {
     const {section,...rest} = item;
@@ -817,7 +821,9 @@ function confirmLog() {
     sec.items.push(rest);
   });
   days[today] = dayData;
+  if (isFirstLog && days[SEED_DATE]) delete days[SEED_DATE];
   saveDays(days);
+  if (isFirstLog) { localStorage.setItem(FIRST_LOG_KEY, '1'); showFirstLogCelebration(); }
   pendingItems = [];
   document.getElementById('today-card').innerHTML = renderDayCard(dayData, today);
   const preview = document.querySelector('.pending-preview');
@@ -828,6 +834,68 @@ function cancelLog() {
   pendingItems = [];
   const preview = document.querySelector('.pending-preview');
   if (preview) preview.remove();
+}
+
+function launchConfetti() {
+  const canvas = document.createElement('canvas');
+  canvas.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:9999';
+  document.body.appendChild(canvas);
+  const ctx = canvas.getContext('2d');
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  const colors = ['#f5e642','#4fd1c5','#f97316','#a855f7','#22c55e','#ef4444','#ffffff'];
+  const particles = Array.from({length: 160}, (_, i) => ({
+    x: Math.random() * canvas.width,
+    y: -10 - Math.random() * 120,
+    vx: (Math.random() - 0.5) * 5,
+    vy: 1.5 + Math.random() * 3.5,
+    w: 7 + Math.random() * 9,
+    h: 4 + Math.random() * 5,
+    color: colors[Math.floor(Math.random() * colors.length)],
+    rot: Math.random() * Math.PI * 2,
+    rotV: (Math.random() - 0.5) * 0.18,
+    phase: Math.random() * Math.PI * 2,
+    alpha: 1,
+    circle: Math.random() < 0.25
+  }));
+  let frame = 0;
+  const total = 260;
+  (function animate() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    frame++;
+    particles.forEach(p => {
+      p.vy += 0.12;
+      p.vx *= 0.995;
+      p.vx += Math.sin(frame * 0.04 + p.phase) * 0.07;
+      p.x += p.vx;
+      p.y += p.vy;
+      p.rot += p.rotV + Math.abs(p.vx) * 0.01;
+      if (frame > total * 0.55) p.alpha = Math.max(0, p.alpha - 1.8 / (total * 0.45));
+      ctx.save();
+      ctx.globalAlpha = p.alpha;
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.rot);
+      ctx.fillStyle = p.color;
+      if (p.circle) { ctx.beginPath(); ctx.arc(0, 0, p.w / 2, 0, Math.PI * 2); ctx.fill(); }
+      else ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+      ctx.restore();
+    });
+    if (frame < total) requestAnimationFrame(animate);
+    else canvas.remove();
+  })();
+}
+
+function showFirstLogCelebration() {
+  launchConfetti();
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;display:flex;align-items:center;justify-content:center;z-index:10000;pointer-events:none';
+  const box = document.createElement('div');
+  box.style.cssText = 'background:var(--yellow);color:var(--black);border:3px solid var(--black);padding:28px 36px;text-align:center;max-width:300px;pointer-events:auto;cursor:pointer';
+  box.innerHTML = '<div style="font-size:22px;font-weight:900;margin-bottom:6px">Congrats on your first log!</div><div style="font-size:13px;font-family:var(--mono);font-weight:500">Keep the streak going.</div>';
+  box.onclick = () => overlay.remove();
+  overlay.appendChild(box);
+  document.body.appendChild(overlay);
+  setTimeout(() => overlay.remove(), 4000);
 }
 
 function showDetail(dateKey, returnView) {
@@ -1063,7 +1131,7 @@ function saveModal() {
 function seedData() {
   if (Object.keys(loadDays()).length) return;
   const days = {};
-  days['2026-04-16']={sections:[{label:'Lunch',items:[{name:'10 pierogis',p:15,c:70,f:0,k:420,sub:''},{name:'2-egg omelette with onion',p:12,c:0,f:10,k:150,sub:''},{name:'1 pan-fried salmon fillet',p:34,c:0,f:14,k:280,sub:'~150g'}]},{label:'Snacks',items:[{name:'Banana + low-fat popcorn',p:0,c:45,f:0,k:205,sub:''}]},{label:'8pm dinner',items:[{name:'Chicken breast',p:50,c:0,f:4,k:240,sub:'~180g'},{name:'Half avocado',p:0,c:0,f:15,k:120,sub:''},{name:'Rice',p:4,c:45,f:0,k:206,sub:'~1 cup'},{name:'Bok choy + cucumber + kimchi',p:0,c:12,f:0,k:60,sub:''},{name:'Half slice garlic bread',p:0,c:12,f:4,k:120,sub:''}]}],activity:'MTB 6km',feeling:4,notes:''};
+  days['2026-04-16']={sections:[{label:'This is an example! Feel free to delete it, and start your own.',items:[{name:'10 pierogis',p:15,c:70,f:0,k:420,sub:''},{name:'2-egg omelette with onion',p:12,c:0,f:10,k:150,sub:''},{name:'1 pan-fried salmon fillet',p:34,c:0,f:14,k:280,sub:'~150g'}]},{label:'Snacks',items:[{name:'Banana + low-fat popcorn',p:0,c:45,f:0,k:205,sub:''}]},{label:'8pm dinner',items:[{name:'Chicken breast',p:50,c:0,f:4,k:240,sub:'~180g'},{name:'Half avocado',p:0,c:0,f:15,k:120,sub:''},{name:'Rice',p:4,c:45,f:0,k:206,sub:'~1 cup'},{name:'Bok choy + cucumber + kimchi',p:0,c:12,f:0,k:60,sub:''},{name:'Half slice garlic bread',p:0,c:12,f:4,k:120,sub:''}]}],activity:'MTB 6km',feeling:4,notes:''};
   saveDays(days);
 }
 
