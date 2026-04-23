@@ -672,9 +672,7 @@ function renderLog() {
     </div>
     <button onclick="openEditModal('${today}')" style="background:var(--yellow);color:var(--black);border-color:var(--yellow);font-size:11px;padding:5px 12px">Edit</button>
   </div>
-  <div class="card" id="today-card">${renderDayCard(dayData, today)}</div>`;
-
-  html += `<div class="chat-box">
+  <div class="chat-box">
     <div class="chat-messages" id="chat-messages">
       <div class="chat-msg ai">Tell me what you ate and I'll log it — e.g. "had 2 eggs and an americano for breakfast, then a bowl of ramen for lunch"</div>
     </div>
@@ -682,7 +680,8 @@ function renderLog() {
       <textarea id="chat-input" placeholder="What did you eat?" rows="1" onkeydown="chatKey(event)"></textarea>
       <button class="chat-send-btn" id="send-btn" onclick="sendChat()">Log it</button>
     </div>
-  </div>`;
+  </div>
+  <div class="card" id="today-card">${renderDayCard(dayData, today)}</div>`;
 
   const pastKeys = Object.keys(days).sort().reverse().filter(k=>k!==today).slice(0,3);
   if (pastKeys.length) {
@@ -725,16 +724,23 @@ async function sendChat() {
   const existing = days[today]||{sections:[]};
   const s = loadSettings();
 
-  const prompt = `You are a nutrition tracking assistant. Extract food items from the user's message and estimate macros.
-Today: ${today}. Targets: ${s.kcal}kcal, ${s.protein}g protein, ${s.carbs}g carbs, ${s.fat}g fat.
+  const prompt = `You are a nutrition tracking assistant. Extract food items and estimate macros using USDA FoodData Central as reference.
+Today: ${today}. Daily targets: ${s.kcal}kcal | ${s.protein}g protein | ${s.carbs}g carbs | ${s.fat}g fat.
 Already logged today: ${JSON.stringify(existing.sections)}.
 
 Return ONLY valid JSON, no markdown, no backticks:
-{"items":[{"section":"Breakfast","name":"2 eggs","sub":"","p":12,"c":0,"f":10,"k":140}],"message":"Logged 2 eggs — 140 kcal, 12g protein."}
+{"items":[{"section":"Breakfast","name":"2 large eggs","sub":"boiled","p":13,"c":1,"f":10,"k":140}],"message":"Logged 2 eggs — 140 kcal, 13g protein."}
 
-Rules: section = Breakfast/Lunch/Dinner/Snack/Dessert (infer from context). Be accurate with macros. Use realistic portions if unspecified.
+Rules:
+- section: Breakfast/Lunch/Dinner/Snack/Dessert — infer from time context or food type
+- sub: preparation method, brand, or variant (e.g. "grilled", "whole milk", "homemade") — leave empty string if unknown
+- Macros in grams. Calories must be consistent: k ≈ (p×4) + (c×4) + (f×9)
+- If quantity is unspecified, use a typical single serving and include assumed portion in name
+- For mixed dishes, return as one item with realistic combined macros
+- If no food is mentioned, return: {"items":[],"message":"I didn't catch any food — try something like 'had oatmeal for breakfast'."}
 
 User message: ${msg}`;
+
 
   try {
     const res = await fetch('/api/chat', {
