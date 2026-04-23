@@ -757,7 +757,7 @@ User message: ${msg}`;
       if (status === 500) throw new Error('Server error — the AI service may be temporarily down. Try again shortly.');
       if (status === 503) throw new Error('AI service overloaded. Try again in a few seconds.');
       const errData = await res.json().catch(() => ({}));
-      throw new Error(errData.error || `Unexpected error (${status})`);
+      throw new Error(errData.error?.message || errData.error || `Unexpected error (${status})`);
     }
 
     const data = await res.json();
