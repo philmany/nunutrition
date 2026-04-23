@@ -37,6 +37,6 @@ export default async function handler(req, res) {
     return res.status(200).json(data);
 
   } catch (err) {
-    return res.status(503).json({ error: 'Failed to reach Google AI service.' });
+    return res.status(503).json({ error: `Failed to reach Google AI service: ${err.message}` });
   }
 }
