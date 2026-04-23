@@ -547,6 +547,48 @@
   <div id="view-settings" style="display:none"></div>
 </div>
 
+<div class="modal-overlay" id="manual-log-modal">
+  <div class="modal">
+    <h2>Log Manually</h2>
+    <div class="form-grid" style="grid-template-columns:repeat(2,minmax(0,1fr))">
+      <div class="form-group full">
+        <label>Item name</label>
+        <input type="text" id="ml-name" placeholder="e.g. Chicken breast">
+      </div>
+      <div class="form-group full">
+        <label>Section</label>
+        <select id="ml-section">
+          <option value="Breakfast">Breakfast</option>
+          <option value="Lunch">Lunch</option>
+          <option value="Dinner">Dinner</option>
+          <option value="Snack">Snack</option>
+          <option value="Dessert">Dessert</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Protein (g)</label>
+        <input type="number" id="ml-p" min="0" placeholder="0">
+      </div>
+      <div class="form-group">
+        <label>Carbs (g)</label>
+        <input type="number" id="ml-c" min="0" placeholder="0">
+      </div>
+      <div class="form-group">
+        <label>Fat (g)</label>
+        <input type="number" id="ml-f" min="0" placeholder="0">
+      </div>
+      <div class="form-group">
+        <label>Calories (kcal)</label>
+        <input type="number" id="ml-k" min="0" placeholder="0">
+      </div>
+    </div>
+    <div class="btn-row">
+      <button onclick="closeManualModal()">Cancel</button>
+      <button class="btn-primary" onclick="submitManualLog()">Add to log</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="edit-modal">
   <div class="modal">
     <h2 id="modal-title">Edit day</h2>
@@ -682,6 +724,9 @@ function renderLog() {
     <div class="chat-input-row">
       <textarea id="chat-input" placeholder="What did you eat?" rows="1" onkeydown="chatKey(event)"></textarea>
       <button class="chat-send-btn" id="send-btn" onclick="sendChat()">Log it</button>
+    </div>
+    <div style="border-top:var(--border);padding:10px 12px">
+      <button onclick="openManualModal()" style="width:100%;background:var(--white);border:2px dashed var(--black);padding:8px;font-size:12px;font-weight:700;font-family:var(--font);letter-spacing:0.04em;text-transform:uppercase;cursor:pointer">+ Log Manually</button>
     </div>
   </div>
   <div class="card" id="today-card">${renderDayCard(dayData, today)}</div>`;
@@ -834,6 +879,44 @@ function cancelLog() {
   pendingItems = [];
   const preview = document.querySelector('.pending-preview');
   if (preview) preview.remove();
+}
+
+function openManualModal() {
+  ['ml-name','ml-p','ml-c','ml-f','ml-k'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('ml-section').value = 'Breakfast';
+  document.getElementById('manual-log-modal').classList.add('open');
+  document.getElementById('ml-name').focus();
+}
+
+function closeManualModal() {
+  document.getElementById('manual-log-modal').classList.remove('open');
+}
+
+function submitManualLog() {
+  const name = document.getElementById('ml-name').value.trim();
+  if (!name) { document.getElementById('ml-name').focus(); return; }
+  const item = {
+    name,
+    sub: '',
+    p: parseInt(document.getElementById('ml-p').value) || 0,
+    c: parseInt(document.getElementById('ml-c').value) || 0,
+    f: parseInt(document.getElementById('ml-f').value) || 0,
+    k: parseInt(document.getElementById('ml-k').value) || 0
+  };
+  const section = document.getElementById('ml-section').value;
+  const today = getTodayKey();
+  const days = loadDays();
+  const isFirstLog = !localStorage.getItem(FIRST_LOG_KEY);
+  const dayData = days[today] || {sections:[],activity:'',feeling:0,notes:''};
+  let sec = dayData.sections.find(s => s.label === section);
+  if (!sec) { sec = {label: section, items: []}; dayData.sections.push(sec); }
+  sec.items.push(item);
+  days[today] = dayData;
+  if (isFirstLog && days[SEED_DATE]) delete days[SEED_DATE];
+  saveDays(days);
+  if (isFirstLog) { localStorage.setItem(FIRST_LOG_KEY, '1'); showFirstLogCelebration(); }
+  document.getElementById('today-card').innerHTML = renderDayCard(dayData, today);
+  closeManualModal();
 }
 
 function launchConfetti() {
