@@ -775,7 +775,7 @@ User message: ${msg}`;
     const raw = data.candidates[0].content.parts[0].text.trim().replace(/```json|```/g, '').trim();
     let parsed;
     try { parsed = JSON.parse(raw); }
-    catch { throw new Error('AI returned an unexpected format. Try again or rephrase your message.'); }
+    catch { console.error('Raw model output:', raw); throw new Error(`AI returned an unexpected format: ${raw}`); }
 
     pendingItems = parsed.items||[];
     thinkEl.remove();
